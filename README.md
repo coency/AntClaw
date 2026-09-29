@@ -74,7 +74,7 @@
 | 目录 / 文件 | 说明 |
 |---|---|
 | `antclaw/` | **扩展源码**（当前版本，含 manifest / 内容脚本 / 弹窗 / 后台 / 图标）|
-| `上架材料/` | Chrome Web Store 上架材料（产品详情、单一用途与权限说明、上架汇总）|
+| `store-listing/` | Chrome Web Store 上架材料（`description.txt`、`single-purpose-and-permission-justifications.txt`、`submission-overview.md`）|
 | `research/` | 接入前调研（新平台接口验证记录：小红书 / B 站）|
 | `docs/index.html` | 隐私政策页（GitHub Pages 部署）|
 | `README.md` | 本文件 |

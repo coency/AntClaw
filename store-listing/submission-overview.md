@@ -4,10 +4,10 @@
 
 ## 材料清单
 
-1. 扩展本体（上传商店）—— creator-extractor_v1.1.2.zip，含 manifest / 图标 / 内容脚本 / 后台服务线程。
-2. 产品详情（长描述）—— 产品详情-店铺描述.txt，商店 Overview 中文长描述。
-3. 单一用途说明 —— 单一用途与权限说明.txt，一句话 + 展开说明。
-4. 逐条权限理由 —— 单一用途与权限说明.txt，downloads / storage / notifications + 4 个主机权限。
+1. 扩展本体（上传商店）—— antclaw-v1.1.2.zip，含 manifest / 图标 / 内容脚本 / 后台服务线程。
+2. 产品详情（长描述）—— description.txt，对应商店 Store listing → Description（中文长描述）。
+3. 单一用途说明 —— single-purpose-and-permission-justifications.txt，一句话 + 展开说明。
+4. 逐条权限理由 —— single-purpose-and-permission-justifications.txt，downloads / storage / notifications + 4 个主机权限。
 5. 隐私政策页 —— docs/index.html（仓库 docs 目录，部署到 GitHub Pages 后填 URL）。
 6. README —— README.md，开发 / 维护说明。
 
@@ -27,8 +27,8 @@
 
 1. 把 docs/index.html 部署到 GitHub Pages，拿到隐私政策 URL。
 2. 在 chrome://webstore/devconsole 完成开发者注册（含两重验证）。
-3. 新建项目，上传 creator-extractor_v1.1.2.zip。
-4. 填写：产品详情（见 产品详情-店铺描述.txt）、类别、权限用途说明（见 单一用途与权限说明.txt）、隐私政策 URL。
+3. 新建项目，上传 antclaw-v1.1.2.zip。
+4. 填写：产品详情（见 description.txt）、类别、权限用途说明（见 single-purpose-and-permission-justifications.txt）、隐私政策 URL。
 5. 先设为「不公开」进行自测，确认无误后改为「公开」。
 6. 提交审核（通常几小时到几天）。
 
