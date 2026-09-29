@@ -3,7 +3,7 @@
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === 'extractDone') { showDoneNotification(); }
-  // 其它类型（如 extractProgress）由弹窗处理，这里不响应
+  // 其它类型消息不在此处理
 });
 
 // 提取完成后弹系统通知（即使用户已关掉弹窗/切到别的页面也能看到）

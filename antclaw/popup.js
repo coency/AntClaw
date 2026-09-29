@@ -25,9 +25,8 @@ function restore() {
     else { setExtractBtn(true); clearCooldown(); setBtns(false); $('result').textContent = ''; setStatus(''); }
   }).catch(() => {});
 }
-// 接收内容脚本的进度提示（抖音逐篇抓详情页较慢）
+// 接收内容脚本的完成通知（结果已写入 storage，这里恢复界面）
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg && msg.type === 'extractProgress') { setStatus((msg.text || '提取中…') + HINT); }
   if (msg && msg.type === 'extractDone' && !successHandled) { restore(); } // 结果已存入 storage，恢复并启用按钮（已处理则不再覆盖）
 });
 restore(); // 打开弹窗时恢复上次成功结果，避免下载按钮一直灰色
