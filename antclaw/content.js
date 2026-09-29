@@ -13,21 +13,19 @@ function cDateYmd(sec) { const d = new Date(sec * 1000); return '' + d.getFullYe
 function sum(a) { return a.reduce((x, y) => x + (parseInt(y, 10) || 0), 0); }
 function last(a) { return a[a.length - 1]; }
 function pct(x) { return (x * 100).toFixed(2) + '%'; }
-// 毫秒 -> H:MM:SS（作品时长，来自 work_list.duration）；向上取整
-function fmtDurMs(ms) { const s = Math.ceil((Number(ms) || 0) / 1000); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60; return h + ':' + pad2(m) + ':' + pad2(sec); }
 function esc(v) { v = String(v == null ? '' : v); if (/^[=+@]/.test(v)) v = "'" + v; return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
 function toCsv(rows) { return rows.map((r) => r.map(esc).join(',')).join('\n') + '\n'; }
 
 // ================= 微信视频号 =================
 async function axhr(url, opt) {
   // 网络错误重试；HTTP 错误（401/403/500）不再重试并给出明确提示；JSON 解析失败才重试。
-  let last;
+  // 注意：此处不要引入名为 last 的变量，会遮蔽上面的全局工具函数 last()。
   for (let k = 0; k < 3; k++) {
     let r;
     try { r = await fetch(url, Object.assign({ credentials: 'include' }, opt)); }
-    catch (e) { last = e; await new Promise((res) => setTimeout(res, 900)); continue; }
+    catch (e) { await new Promise((res) => setTimeout(res, 900)); continue; }
     if (!r.ok) throw new Error('请求失败（HTTP ' + r.status + '）：请确认已登录对应平台后再操作');
-    try { return await r.json(); } catch (e) { last = e; await new Promise((res) => setTimeout(res, 900)); }
+    try { return await r.json(); } catch (e) { await new Promise((res) => setTimeout(res, 900)); }
   }
   throw new Error('请求失败：请确认已登录对应平台后再操作（若已登录请刷新页面重试）');
 }
@@ -81,15 +79,29 @@ async function channelsExtract(period) {
   const tabs = (post.data && post.data.dataByTabtype) || [];
   // 各渠道分解（浏览来源等）：仅用于「推荐/分享/主页/朋友/订阅号/关注/其他」这组来源分解。
   const rows = tabs.map((t) => { const d = t.data || {}; const row = { channel: t.tabTypeName || ('type' + t.tabType) }; for (const m of METRICS) row[m] = sum(d[m] || []); return row; });
+  const KNOWN_CH = ['推荐', '分享', '主页', '朋友♡', '订阅号消息', '关注'];
   // 汇总总量：用接口自带的 totalData，它是后台显示的权威汇总值。
   // 不能对 dataByTabtype 求和——同一作品会被多个来源渠道重复曝光，like/fav 等会重复计数
   // （例如"推荐"里的 like 与"订阅号消息/朋友"里的同一条可能重叠，求和会多算）。
   const td = (post.data && post.data.totalData) || {};
   const total = {}; for (const m of METRICS) total[m] = td[m] ? sum(td[m]) : rows.reduce((a, r) => a + r[m], 0);
-  const brk = Object.fromEntries(rows.filter((r) => !['PC微信', '看一看', '其他'].includes(r.channel)).map((r) => [r.channel, r.browse]));
-  const other = rows.filter((r) => ['PC微信', '看一看', '其他'].includes(r.channel)).reduce((a, r) => a + r.browse, 0); brk['其他'] = other;
-  let fans = null; try { const f = await axhr(vx('fans_trend'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (f.errCode === 0 && f.data) { const d = f.data; // total[] 逐日累计且已含当日净增（Δtotal[i] === netAdd[i]），last(total) 即该周期末尾收盘值；不要再加 last(netAdd)，否则把最后一天净增重复算一遍
-    fans = { monthEnd: parseInt(last(d.total), 10) || 0, netAdd: sum(d.netAdd) }; } } catch (e) {}
+  // 来源分解：只输出已知渠道；PC微信/看一看/其他 以及**平台新增的未知渠道**一律并入「其他」，
+  // 避免出现"某个渠道的播放量被丢弃、分解之和 != 总播放量"。
+  const brk = {}; for (const c of KNOWN_CH) brk[c] = 0;
+  brk['其他'] = rows.reduce((a, r) => a + (KNOWN_CH.includes(r.channel) ? 0 : r.browse), 0);
+  for (const r of rows) if (KNOWN_CH.includes(r.channel)) brk[r.channel] = r.browse;
+  let fans = null, fansWarn = '';
+  try {
+    const f = await axhr(vx('fans_trend'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (f.errCode === 0 && f.data) {
+      const d = f.data;
+      // total[] 逐日累计且已含当日净增（Δtotal[i] === netAdd[i]），last(total) 即该周期末尾收盘值；
+      // 不要再加 last(netAdd)，否则把最后一天净增重复算一遍。
+      fans = { monthEnd: parseInt(last(d.total), 10) || 0, netAdd: sum(d.netAdd) };
+    } else if (f.errCode !== 0) {
+      fansWarn = (f.errCode === 300333 || f.errCode === 300800 || f.errCode === 300334) ? '登录已失效' : ('错误码' + f.errCode + '：' + (f.errMsg || ''));
+    } else { fansWarn = '接口未返回数据'; }
+  } catch (e) { fansWarn = String((e && e.message) || e); }
   const summaryCsv = toCsv([['周期', '播放量', '推荐播放量', '分享播放量', '主页播放量', '朋友播放量', '订阅号消息播放量', '关注播放量', '其他播放量', '朋友量', '点赞量', '评论量', '分享量', '关注者量', '关注者总数'], [R.label, total.browse, brk['推荐'], brk['分享'], brk['主页'], brk['朋友♡'], brk['订阅号消息'], brk['关注'], brk['其他'], total.like, total.fav, total.comment, total.forward, fans ? fans.netAdd : '', fans ? fans.monthEnd : '']]);
   // 单篇作品
   let posts = [], postCsv = '', postWarn = '';
@@ -110,7 +122,11 @@ async function channelsExtract(period) {
     posts = all.map((it, i) => { const m = (it.desc && it.desc.media && it.desc.media[0]) || {}; const coverUrl = m.coverUrl || m.fullCoverUrl || m.thumbUrl || ''; return { publish: cDate(it.createTime), durationSec: m.videoPlayLen != null ? m.videoPlayLen : 0, plays: it.readCount, fullRate: it.fullPlayRate != null ? pct(it.fullPlayRate) : '', avgPlay: it.avgPlayTimeSec != null ? Number(it.avgPlayTimeSec).toFixed(2) : '0', friends: it.likeCount, likes: it.favCount, comments: it.commentCount, shares: it.forwardAggregationCount, follows: it.followCount, wclick: it.wecomLinkClickCount != null ? it.wecomLinkClickCount : '', wuv: it.wecomLinkClickUv != null ? it.wecomLinkClickUv : '', wadd: it.wecomContactAddCount != null ? it.wecomContactAddCount : '', wadduv: it.wecomContactAddUv != null ? it.wecomContactAddUv : '', coverUrl, coverFileName: (coverUrl ? String(i + 1).padStart(2, '0') + '_' + it.createTime + '.jpg' : '') }; });
     postCsv = toCsv([['发布日期', '封面', '作品时长', '播放量', '完播率', '平均播放时长', '朋友量', '点赞量', '评论量', '分享量', '关注量', '企微点击次数', '企微点击人数', '添加通讯录次数', '添加通讯录人数']].concat(posts.map((p) => [p.publish, p.coverFileName, p.durationSec, p.plays, p.fullRate, p.avgPlay, p.friends, p.likes, p.comments, p.shares, p.follows, p.wclick, p.wuv, p.wadd, p.wadduv])));
   } catch (e) { postWarn = String((e && e.message) || e); }
-  return { platform: '视频号', scopeLabel, periodName: R.label, period: R.label, rangeText: fmtRange(R.startD) + '-' + fmtRange(R.endD), summaryCsv, postCsv, posts, coverFolder: R.label + '_' + scopeLabel + '作品封面', count: posts.length, warning: postWarn ? '汇总数据提取成功，但单篇获取失败，请重试（' + postWarn + '）' : '' };
+  // 汇总各段警告：粉丝数据失败会让「关注者量/关注者总数」两列为空，必须显式告知，避免误以为"本期没涨粉"。
+  const warns = [];
+  if (fansWarn) warns.push('关注者数据获取失败（' + fansWarn + '），“关注者量 / 关注者总数”两列为空');
+  if (postWarn) warns.push('单篇获取失败，请重试（' + postWarn + '）');
+  return { platform: '视频号', scopeLabel, periodName: R.label, period: R.label, rangeText: fmtRange(R.startD) + '-' + fmtRange(R.endD), summaryCsv, postCsv, posts, coverFolder: R.label + '_' + scopeLabel + '作品封面', count: posts.length, warning: warns.join('；') };
 }
 
 // ================= 抖音 =================
@@ -127,6 +143,8 @@ async function douyinExtract(period, concurrency) {
   const scopeLabel = period === 'week' ? '周度' : '月度';
   const R = period === 'week' ? weekInfo() : monthInfo();
   const B = 'https://creator.douyin.com/janus/douyin/creator/data/';
+  // 统计区间由 date_range 决定（实测：recent_days 取 1/7/30/365 返回值完全一致，不影响结果）；
+  // recent_days 仅用于与前端请求形态保持一致，不要用它来推导周期。
   const dashBody = { recent_days: 30, date_range: { start_date: R.startD, end_date: R.endD } };
   const dashJson = await axhr(B + 'overview/dashboard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dashBody) });
   assertLogin(dashJson);

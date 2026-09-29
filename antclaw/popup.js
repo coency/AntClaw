@@ -135,13 +135,13 @@ async function doExtract() {
     const platform = $('platform').value, period = $('period').value;
     const tab = await activeTab();
     if (!tab || !tab.url || !urlMatches(tab.url, platform)) { setBtns(false); setExtractBtn(true); clearCooldown(); setStatus('请先打开并登录「' + platform + '」：' + (LOGIN_URL[platform] || '')); return; }
-    const r = await sendToTabRetry(tab.id, { type: 'extract', platform, period, detailFields: true, concurrency: 4 });
+    const r = await sendToTabRetry(tab.id, { type: 'extract', platform, period, concurrency: 4 });
     if (!r || !r.ok) throw new Error((r && r.error) || '无响应');
     latest = r.data; render(latest); syncSelectsToLatest(); setBtns(true); startCooldown(COOLDOWN_S, '完成 ✓ 可点击上方「下载」保存'); successHandled = true;
   } catch (e) { setBtns(false); setExtractBtn(true); clearCooldown(); setStatus('提取失败！' + e.message, true); }
 }
 $('extract').addEventListener('click', doExtract);
-// 注意：不因切换平台/周期/详情/并发而清空 60 秒冷却，避免绕过风控；冷却由 startCooldown 统一管理。
+// 注意：不因切换平台/周期而清空 60 秒冷却，避免绕过风控；冷却由 startCooldown 统一管理。
 $('csv').addEventListener('click', () => { if (!latest) { setStatus('请先「提取数据」', true); return; } download(latest.platform + '_' + latest.periodName + '_' + latest.scopeLabel + '汇总数据统计.csv', '\uFEFF' + latest.summaryCsv, 'text/csv'); setStatus('已发起下载汇总CSV'); });
 $('postCsv').addEventListener('click', () => { if (!latest || !latest.posts || !latest.posts.length) { setStatus('请先「提取数据」或本期无作品', true); return; } download(latest.platform + '_' + latest.periodName + '_' + latest.scopeLabel + '作品数据统计.csv', '\uFEFF' + latest.postCsv, 'text/csv'); setStatus('已发起下载单篇CSV'); });
 $('zipCover').addEventListener('click', async () => { if (!latest || !latest.posts || !latest.posts.length) { setStatus('请先「提取数据」或无封面', true); return; } setStatus('正在打包封面…'); try { const files = []; let total = 0, ok = 0; const fails = []; for (const p of latest.posts) { if (!p.coverUrl || !p.coverFileName) continue; total++; const nm = p.coverFileName; try { const r = await fetch(p.coverUrl); if (r.ok) { files.push({ name: nm, data: new Uint8Array(await r.arrayBuffer()) }); ok++; } else { fails.push(nm + '(HTTP ' + r.status + ')'); } } catch (e) { fails.push(nm + '(网络/' + ((e && e.message) || '取图失败') + ')'); } } if (!files.length) { setStatus('没有可打包封面（共尝试 ' + total + ' 张' + (fails.length ? '，失败 ' + fails.length + ' 张，如：' + fails.slice(0, 3).join('、') : '') + '）', true); return; } const blob = buildZip(files); const url = URL.createObjectURL(blob); chrome.downloads.download({ url, filename: latest.platform + '_' + latest.coverFolder + '.zip', saveAs: true }, () => URL.revokeObjectURL(url)); setStatus('已打包 ' + files.length + ' 张封面' + (ok < total ? '（' + (total - ok) + ' 张失败：' + fails.slice(0, 3).join('、') + (fails.length > 3 ? ' 等' : '') + '，可能因图片链接过期）' : '')); } catch (e) { setStatus('失败: ' + e.message, true); } });
