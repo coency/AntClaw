@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "爬爬蚁",
+  "version": "1.1.2",
+  "description": "多平台创作者数据中心一键导出 CSV：抖音/视频号；小红书、哔哩哔哩即将支持。按 上一个月/上一周 导出汇总、单篇与作品封面。",
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "爬爬蚁"
+  },
+  "permissions": ["downloads", "storage", "notifications"],
+  "host_permissions": [
+    "https://creator.douyin.com/*",
+    "https://*.douyinpic.com/*",
+    "https://channels.weixin.qq.com/*",
+    "https://finder.video.qq.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://creator.douyin.com/*", "https://channels.weixin.qq.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
