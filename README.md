@@ -34,7 +34,7 @@
 
 ### 使用发布包
 
-发布包命名为 `chrome-extension-antclaw-v<版本号>.zip`，解压后目录结构即为扩展本体（`manifest.json` 位于 zip 根目录），既可「加载已解压的扩展程序」，也可直接上传 Chrome Web Store。
+发布包命名为 `chrome-extension-antclaw-v<版本号>.zip`，解压后目录结构即为扩展本体（`manifest.json` 位于 zip 根目录），既可「加载已解压的扩展程序」，也可直接上传 Chrome 应用商店。
 
 ## 使用方法
 
@@ -104,7 +104,7 @@
 - 视频号的渠道来源分解依赖接口返回的渠道名；平台新增或改名时，未识别渠道会并入「其他」（总量不受影响）。
 - 视频号接口依赖 Web 端固定参数（`_aid` 等）与页面内的账号标识；平台改版可能导致失败，需随版本更新维护。
 
-## 常见问题（FAQ）
+## 常见问题
 
 - **点「提取数据」提示先打开并登录平台？** 当前标签页不是所选平台。先打开并登录对应页面（抖音 `creator.douyin.com` / 视频号 `channels.weixin.qq.com`），再回弹窗点击。
 - **提示「登录已失效」？** 刷新对应平台页面后重试。
@@ -149,7 +149,7 @@
 | `LICENSE` | 许可声明（专有，保留所有权利）|
 
 - **隐私政策**：`docs/index.html`（GitHub Pages 部署）。在线地址：<https://coency.github.io/chrome-extension-antclaw/>
-  > 仓库改名会改变该地址（项目页地址含仓库名、**旧地址不会重定向**）；改名后请同步更新 Chrome Web Store 里填写的隐私政策链接。
+  > 仓库改名会改变该地址（项目页地址含仓库名、**旧地址不会重定向**）；改名后请同步更新 Chrome 应用商店 里填写的隐私政策链接。
 
 ## 开发
 
@@ -205,11 +205,11 @@ Compress-Archive -Path manifest.json,background.js,content.js,popup.html,popup.j
 ```
 
 - 命名规则：`chrome-extension-antclaw-v<版本号>.zip`。
-- 作为 Chrome Web Store 的**更新**上传时，`manifest.json` 的 `version` 必须高于已发布版本。
+- 作为 Chrome 应用商店 的**更新**上传时，`manifest.json` 的 `version` 必须高于已发布版本。
 
 ## 版本与更新记录
 
-- 当前版本：**v1.1.2**（`manifest.json` 与本文档同步）。历史版本以 git 标签与 Releases 记录。
+- 当前版本：**v1.1.2**（`manifest.json` 与本文档同步）。历史版本以 git 标签与发布记录。
 - 本仓库工作区已包含一轮尚未发布（未打 tag）的修复：
   - 视频号周/月区间的结束时间修正为最后一天 `23:59:59`，不再漏掉区间末日数据；
   - 渠道来源分解改为累加，同名渠道不再互相覆盖；
@@ -221,7 +221,7 @@ Compress-Archive -Path manifest.json,background.js,content.js,popup.html,popup.j
 
 ## 反馈与支持
 
-- 问题与建议：本仓库 Issues（<https://github.com/coency/chrome-extension-antclaw/issues>）。
+- 问题与建议：本仓库的问题反馈（<https://github.com/coency/chrome-extension-antclaw/issues>）。
 - 交流群：QQ 群 **1107628766**。
 
 ## 许可证

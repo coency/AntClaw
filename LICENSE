@@ -1,43 +1,12 @@
-爬爬蚁（AntClaw）—— 许可声明 / License Notice
-Copyright (c) 2026 koency. All rights reserved.
-版权所有，保留所有权利。
+爬爬蚁（AntClaw）许可声明
+版权所有 © 2026 koency，保留所有权利。
 
-本仓库（扩展源码 manifest.json / content.js / popup.html / popup.js / background.js、
-图标资源、docs/ 隐私政策页、research/ 调研材料及本文档）为上述版权持有人的专有作品，
-未附任何开源许可证。在未取得版权持有人事先许可的情况下，不授予你任何复制、分发、
-修改后再分发或商业使用的权利（GitHub 等托管平台自身服务条款赋予的查看与 Fork 能力不受影响）。
+本仓库（扩展源码 manifest.json / content.js / popup.html / popup.js / background.js、图标资源、docs/ 隐私政策页、research/ 调研材料及本文档）为上述版权持有人的专有作品，未附任何开源许可证。在未取得版权持有人事先许可的情况下，不授予你任何复制、分发、修改后再分发或商业使用的权利（GitHub 等托管平台自身服务条款赋予的查看与 Fork 能力不受影响）。
 
 你可以：
   1. 在本地安装并使用本扩展，用于管理你自己或你被授权管理的账号；
   2. 为学习与评估目的在本地阅读、修改源码（不得对外分发修改后的版本）。
 
-本软件按“现状（AS IS）”提供，不附带任何明示或默示的担保，包括但不限于对适销性、
-特定用途适用性及不侵权的担保。因使用本软件产生的任何索赔、损害或其他责任，
-版权持有人均不承担责任。
+本软件按「现状」提供，不附带任何明示或默示的担保，包括但不限于对适销性、特定用途适用性及不侵权的担保。因使用本软件产生的任何索赔、损害或其他责任，版权持有人均不承担责任。
 
-如需开源许可（如 MIT / Apache-2.0）或其他形式的授权，请联系版权持有人：
-koency@gmail.com
-
----
-
-AntClaw — License Notice
-Copyright (c) 2026 koency. All rights reserved.
-
-This repository and all of its contents are proprietary. No open-source license is
-granted. Without the prior permission of the copyright holder, you are not granted
-any right to copy, distribute, redistribute modified versions, or use this work
-commercially. Viewing and forking provided by the hosting platform's own terms of
-service are unaffected.
-
-You may install and use the extension locally for your own or authorized accounts,
-and read/modify the source locally for learning and evaluation, provided you do not
-redistribute the modified version.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
-INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OF THE SOFTWARE.
-
-For open-source licensing (e.g. MIT / Apache-2.0) or other permissions, contact:
-koency@gmail.com
+如需开源许可（如 MIT / Apache-2.0）或其他形式的授权，请联系版权持有人：koency@gmail.com
