@@ -25,7 +25,7 @@
 
 ### 从源码加载（开发者模式）
 
-1. 获取源码：`git clone https://github.com/coency/AntClaw.git`（或下载仓库 ZIP 解压）。
+1. 获取源码：`git clone https://github.com/coency/chrome-extension-antclaw.git`（或下载仓库 ZIP 解压）。
 2. 打开 `chrome://extensions`，右上角开启**开发者模式**。
 3. 点「**加载已解压的扩展程序**」，选择**本仓库根目录**（即含 `manifest.json` 的那一层）。
 4. 在已登录创作者平台的页面点击扩展图标即可使用。
@@ -148,7 +148,8 @@
 | `README.md` | 本文件 |
 | `LICENSE` | 许可声明（专有，保留所有权利）|
 
-- **隐私政策**：`docs/index.html`（如已启用 GitHub Pages，则发布在该仓库的 Pages 地址）。
+- **隐私政策**：`docs/index.html`（GitHub Pages 部署）。在线地址：<https://coency.github.io/chrome-extension-antclaw/>
+  > 仓库改名会改变该地址（项目页地址含仓库名、**旧地址不会重定向**）；改名后请同步更新 Chrome Web Store 里填写的隐私政策链接。
 
 ## 开发
 
@@ -220,7 +221,7 @@ Compress-Archive -Path manifest.json,background.js,content.js,popup.html,popup.j
 
 ## 反馈与支持
 
-- 问题与建议：本仓库 Issues（<https://github.com/coency/AntClaw/issues>）。
+- 问题与建议：本仓库 Issues（<https://github.com/coency/chrome-extension-antclaw/issues>）。
 - 交流群：QQ 群 **1107628766**。
 
 ## 许可证
