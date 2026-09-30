@@ -1,6 +1,7 @@
 // popup.js —— 统一多平台弹窗：三步式（平台/周期/功能）
 const HINT = '（可先关闭，完成后再回来下载）';
 const RUNNING_STALE_MS = 30 * 60 * 1000; // 提取中超过 30 分钟视为陈旧（防死锁），自动重置
+const FAIL_COOLDOWN_S = 5; // 提取失败后的短冷却：既提示可立即重试，又保持「不能连点」的风控约束
 // 平台 → 官方登录/数据中心地址（未登录/未打开平台页时，按所选平台提示）
 const LOGIN_URL = {
   '视频号': 'https://channels.weixin.qq.com',
@@ -10,8 +11,10 @@ const LOGIN_URL = {
 };
 let latest = null;
 let successHandled = false; // 本次弹窗会话是否已成功处理过提取结果，避免 extractDone 覆盖「完成 ✓」
+let userActed = false; // 用户是否已点过「提取数据」：避免 restore() 的异步回调覆盖刚更新的界面
 function restore() {
   chrome.storage.local.get(['running', 'runningAt', 'lastResult']).then((v) => {
+    if (userActed) return; // 用户已经点过提取，别用存储里的旧状态覆盖当前界面
     if (v && v.running) {
       const stale = !v.runningAt || (Date.now() - v.runningAt) > RUNNING_STALE_MS;
       if (stale) { // 陈旧（提取页已关/内容脚本崩）：直接重置，避免永久「提取中」
@@ -48,10 +51,13 @@ function waitTabComplete(tabId, timeoutMs) {
     chrome.tabs.get(tabId, (t) => { if (chrome.runtime.lastError) return finish(); if (t && t.status === 'complete') finish(); });
   });
 }
-// 发送失败（内容脚本缺失，如扩展重载前的旧标签页）→ 刷新重载该页使内容脚本注入 → 重发一次
+// 发送失败（内容脚本缺失，如扩展重载前的旧标签页）→ 刷新重载该页使内容脚本注入 → 重发一次。
+// 只有「根本没有接收方」才刷新页面；其它异常（页面正在导航、脚本报错等）刷新会丢掉用户在当前页的状态。
 async function sendToTabRetry(tabId, msg) {
   try { return await sendToTab(tabId, msg); }
   catch (e) {
+    const m = String((e && e.message) || e);
+    if (!/Receiving end does not exist|Could not establish connection/i.test(m)) throw e;
     await new Promise((r2) => chrome.tabs.reload(tabId, () => r2()));
     await waitTabComplete(tabId, 20000);
     return await sendToTab(tabId, msg);
@@ -84,9 +90,35 @@ function render(d) {
   if (d.warning) t += '⚠ ' + d.warning + '\n';
   $('result').textContent = t;
 }
-function download(name, content, mime) {
-  const url = URL.createObjectURL(new Blob([content], { type: mime }));
-  chrome.downloads.download({ url, filename: name, saveAs: true }, () => URL.revokeObjectURL(url));
+// 下载：objectURL 不能在 downloads.download() 的回调里立刻 revoke——大 CSV / 封面 ZIP 可能还没读完就被中断。
+// 改为等 downloads.onChanged 报 complete/interrupted 后再释放，并保留 5 分钟兜底。
+const pendingUrls = new Map();
+try {
+  chrome.downloads.onChanged.addListener((d) => {
+    if (!d || d.id == null || !pendingUrls.has(d.id)) return;
+    const st = d.state && d.state.current;
+    if (st === 'complete' || st === 'interrupted') { URL.revokeObjectURL(pendingUrls.get(d.id)); pendingUrls.delete(d.id); }
+  });
+} catch (e) {}
+function saveBlob(name, blob) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    chrome.downloads.download({ url, filename: name, saveAs: true }, (id) => {
+      const err = chrome.runtime.lastError;
+      if (err || id == null) { URL.revokeObjectURL(url); setStatus('下载失败：' + ((err && err.message) || '未开始下载'), true); resolve(false); return; }
+      pendingUrls.set(id, url);
+      setTimeout(() => { if (pendingUrls.has(id)) { URL.revokeObjectURL(pendingUrls.get(id)); pendingUrls.delete(id); } }, 5 * 60 * 1000);
+      resolve(true);
+    });
+  });
+}
+function download(name, content, mime) { return saveBlob(name, new Blob([content], { type: mime })); }
+// 并发池：最多 limit 个任务同时进行，结果按原顺序返回（与 content.js 的 pMap 同思路）
+async function pMapLimit(limit, items, fn) {
+  const results = new Array(items.length); let next = 0;
+  const worker = async () => { while (next < items.length) { const i = next++; results[i] = await fn(items[i], i); } };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, () => worker()));
+  return results;
 }
 
 function crc32(buf) { let t = crc32.t || (crc32.t = (() => { const a = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); a[n] = c >>> 0; } return a; })()); let c = 0xFFFFFFFF; for (let i = 0; i < buf.length; i++) c = t[(c ^ buf[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
@@ -130,6 +162,7 @@ function refreshBtnState(doneMsg) {
   }).catch(() => { setExtractBtn(true); clearCooldown(); });
 }
 async function doExtract() {
+  userActed = true;
   setStatus('提取中…' + HINT); $('result').textContent = ''; setBtns(false); setExtractBtn(false); clearCooldown(); successHandled = false;
   try {
     const platform = $('platform').value, period = $('period').value;
@@ -138,10 +171,41 @@ async function doExtract() {
     const r = await sendToTabRetry(tab.id, { type: 'extract', platform, period, concurrency: 4 });
     if (!r || !r.ok) throw new Error((r && r.error) || '无响应');
     latest = r.data; render(latest); syncSelectsToLatest(); setBtns(true); startCooldown(COOLDOWN_S, '完成 ✓ 可点击上方「下载」保存'); successHandled = true;
-  } catch (e) { setBtns(false); setExtractBtn(true); clearCooldown(); setStatus('提取失败！' + e.message, true); }
+  } catch (e) {
+    setBtns(false); clearCooldown(); setStatus('提取失败！' + e.message, true);
+    startCooldown(FAIL_COOLDOWN_S); // 失败也给短冷却：不能因为"失败"就绕过连点约束
+  }
 }
 $('extract').addEventListener('click', doExtract);
 // 注意：不因切换平台/周期而清空 60 秒冷却，避免绕过风控；冷却由 startCooldown 统一管理。
-$('csv').addEventListener('click', () => { if (!latest) { setStatus('请先「提取数据」', true); return; } download(latest.platform + '_' + latest.periodName + '_' + latest.scopeLabel + '汇总数据统计.csv', '\uFEFF' + latest.summaryCsv, 'text/csv'); setStatus('已发起下载汇总CSV'); });
-$('postCsv').addEventListener('click', () => { if (!latest || !latest.posts || !latest.posts.length) { setStatus('请先「提取数据」或本期无作品', true); return; } download(latest.platform + '_' + latest.periodName + '_' + latest.scopeLabel + '作品数据统计.csv', '\uFEFF' + latest.postCsv, 'text/csv'); setStatus('已发起下载单篇CSV'); });
-$('zipCover').addEventListener('click', async () => { if (!latest || !latest.posts || !latest.posts.length) { setStatus('请先「提取数据」或无封面', true); return; } setStatus('正在打包封面…'); try { const files = []; let total = 0, ok = 0; const fails = []; for (const p of latest.posts) { if (!p.coverUrl || !p.coverFileName) continue; total++; const nm = p.coverFileName; try { const r = await fetch(p.coverUrl); if (r.ok) { files.push({ name: nm, data: new Uint8Array(await r.arrayBuffer()) }); ok++; } else { fails.push(nm + '(HTTP ' + r.status + ')'); } } catch (e) { fails.push(nm + '(网络/' + ((e && e.message) || '取图失败') + ')'); } } if (!files.length) { setStatus('没有可打包封面（共尝试 ' + total + ' 张' + (fails.length ? '，失败 ' + fails.length + ' 张，如：' + fails.slice(0, 3).join('、') : '') + '）', true); return; } const blob = buildZip(files); const url = URL.createObjectURL(blob); chrome.downloads.download({ url, filename: latest.platform + '_' + latest.coverFolder + '.zip', saveAs: true }, () => URL.revokeObjectURL(url)); setStatus('已打包 ' + files.length + ' 张封面' + (ok < total ? '（' + (total - ok) + ' 张失败：' + fails.slice(0, 3).join('、') + (fails.length > 3 ? ' 等' : '') + '，可能因图片链接过期）' : '')); } catch (e) { setStatus('失败: ' + e.message, true); } });
+$('csv').addEventListener('click', async () => { if (!latest) { setStatus('请先「提取数据」', true); return; } const ok = await download(latest.platform + '_' + latest.periodName + '_' + latest.scopeLabel + '汇总数据统计.csv', '\uFEFF' + latest.summaryCsv, 'text/csv'); if (ok) setStatus('已发起下载汇总CSV'); });
+$('postCsv').addEventListener('click', async () => { if (!latest || !latest.posts || !latest.posts.length) { setStatus('请先「提取数据」或本期无作品', true); return; } const ok = await download(latest.platform + '_' + latest.periodName + '_' + latest.scopeLabel + '作品数据统计.csv', '\uFEFF' + latest.postCsv, 'text/csv'); if (ok) setStatus('已发起下载单篇CSV'); });
+$('zipCover').addEventListener('click', async () => {
+  if (!latest || !latest.posts || !latest.posts.length) { setStatus('请先「提取数据」或无封面', true); return; }
+  try {
+    const targets = latest.posts.filter((p) => p.coverUrl && p.coverFileName);
+    if (!targets.length) { setStatus('本期作品没有可用的封面链接', true); return; }
+    setStatus('正在打包封面… 0/' + targets.length);
+    const fails = []; let done = 0;
+    // 并发取图（弹窗内存有限，固定 5 并发）；失败的把域名一并带出，便于判断是否缺 host_permissions
+    const files = await pMapLimit(5, targets, async (p) => {
+      try {
+        const r = await fetch(p.coverUrl);
+        if (!r.ok) { fails.push(p.coverFileName + '(HTTP ' + r.status + ')'); return null; }
+        return { name: p.coverFileName, data: new Uint8Array(await r.arrayBuffer()) };
+      } catch (e) {
+        let host = ''; try { host = new URL(p.coverUrl).host; } catch (e2) {}
+        fails.push(p.coverFileName + (host ? '@' + host : '') + '(网络/' + ((e && e.message) || '取图失败') + ')');
+        return null;
+      } finally {
+        done++;
+        if (done === targets.length || done % 10 === 0) setStatus('正在打包封面… ' + done + '/' + targets.length);
+      }
+    });
+    const list = files.filter(Boolean);
+    if (!list.length) { setStatus('没有可打包封面（共尝试 ' + targets.length + ' 张' + (fails.length ? '，失败 ' + fails.length + ' 张，如：' + fails.slice(0, 3).join('、') : '') + '）', true); return; }
+    const saved = await saveBlob(latest.platform + '_' + latest.coverFolder + '.zip', buildZip(list));
+    if (!saved) return;
+    setStatus('已打包 ' + list.length + ' 张封面' + (fails.length ? '（' + fails.length + ' 张失败：' + fails.slice(0, 3).join('、') + (fails.length > 3 ? ' 等' : '') + '，可能因图片链接过期或封面域名缺少权限）' : ''));
+  } catch (e) { setStatus('失败: ' + e.message, true); }
+});
